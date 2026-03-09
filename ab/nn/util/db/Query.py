@@ -9,11 +9,13 @@ from ab.nn.util.Const import main_columns_ext, tmp_data
 
 #-----curriculum bands-----
 
+
 SIM_BANDS: dict[str, tuple[float, float]] = {
-    "high": (0.95, 1.0000001),
-    "medium": (0.85, 0.95),
-    "low": (0.60, 0.85),
-    "very_low": (0.0, 0.60),
+    "high":          (0.95, 1.0000001),
+    "medium":        (0.85, 0.95),
+    "very_low_near": (0.30, 0.60),
+    "very_low_far":  (0.0,  0.30),
+    "low":           (0.60, 0.85),   # kept for completeness, empirically empty
 }
 
 
@@ -147,15 +149,31 @@ def _anchor_band_db(
             jaccard_blobs((SELECT a_hv FROM anchor), c.hv) AS j
           FROM cand c
         )
-        SELECT d.*, s.j AS anchor_jaccard
+        SELECT
+          st.*,
+          n.code AS nn_code,
+          t.code AS transform_code,
+          st.prm AS prm_id,
+          s.j AS anchor_jaccard,
+          ? AS anchor_nn
         FROM scored s
-        JOIN {work_table} d ON d.id = s.id
+        JOIN stat st       ON st.id = s.id
+        JOIN nn n          ON n.name = st.nn
+        JOIN transform t   ON t.name = st.transform
         WHERE s.j IS NOT NULL
           AND s.j >= ? AND s.j < ?
         ORDER BY s.accuracy DESC, s.j DESC, s.nn ASC, s.epoch ASC
         LIMIT ?
         """,
-        [*where_params, anchor_nn, anchor_nn, float(min_j), float(max_j), int(limit_k)],
+        [
+            *where_params,
+            anchor_nn,  # anchor CTE
+            anchor_nn,  # exclude anchor
+            anchor_nn,  # anchor_nn output column
+            float(min_j),
+            float(max_j),
+            int(limit_k),
+        ],
     )
 #---------Band Aware Anchor Selection---------
 def _resolve_anchor(
