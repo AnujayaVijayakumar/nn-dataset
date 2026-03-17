@@ -611,5 +611,3 @@ def fill_hyper_prm(cur: Cursor, num_joint_nns=1, include_nn_stats=False) -> list
 
         results.append(rec)
     return results
-
-#new
